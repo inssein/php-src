@@ -26,19 +26,19 @@ $idCallable = function (stdClass $row) {
 
 $firstNameCallable = function (stdClass $row) {
     return $row->first_name;
-}
+};
 
 $lastNameCallable = function (stdClass $row) {
     return $row->last_name;
-}
+};
 
 echo "*** Testing array_column() : callable functionality ***\n";
 
 /* Array representing a possible record set returned from a database */
 $records = array(
-   $this->getMockObject(1, 'John', 'Doe'),
-   $this->getMockObject(2, 'Sally', 'Smith'),
-   $this->getMockObject(3, 'Jane', 'Jones')
+   getMockObject(1, 'John', 'Doe'),
+   getMockObject(2, 'Sally', 'Smith'),
+   getMockObject(3, 'Jane', 'Jones')
 );
 
 echo "-- first_name column from recordset --\n";
@@ -93,5 +93,4 @@ array(3) {
   ["Jane"]=>
   string(5) "Jones"
 }
-
 Done
