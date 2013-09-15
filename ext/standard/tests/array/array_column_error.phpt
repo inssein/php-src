@@ -62,21 +62,21 @@ NULL
 
 -- Testing array_column() column key parameter should be a string or an integer (testing bool) --
 
-Warning: array_column(): The column key should be either a string or an integer in %s on line %d
+Warning: array_column(): The column key should be a string, an integer, or a callable in %s on line %d
 bool(false)
 
 -- Testing array_column() column key parameter should be a string or integer (testing array) --
 
-Warning: array_column(): The column key should be either a string or an integer in %s on line %d
+Warning: array_column(): The column key should be a string, an integer, or a callable in %s on line %d
 bool(false)
 
 -- Testing array_column() index key parameter should be a string or an integer (testing bool) --
 
-Warning: array_column(): The index key should be either a string or an integer in %s on line %d
+Warning: array_column(): The index key should be a string, an integer, or a callable in %s on line %d
 bool(false)
 
 -- Testing array_column() index key parameter should be a string or integer (testing array) --
 
-Warning: array_column(): The index key should be either a string or an integer in %s on line %d
+Warning: array_column(): The index key should be a string, an integer, or a callable in %s on line %d
 bool(false)
 Done
