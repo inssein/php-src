@@ -2530,7 +2530,13 @@ PHP_FUNCTION(array_count_values)
  */
 static inline
 zend_bool array_column_param_helper(zval **param,
+                                    zend_bool is_callable,
                                     const char *name TSRMLS_DC) {
+	// a callable doesn't need any type checking
+	if(is_callable) {
+	    return 1;
+	}
+
 	switch (Z_TYPE_PP(param)) {
 		case IS_DOUBLE:
 			convert_to_long_ex(param);
@@ -2545,7 +2551,7 @@ zend_bool array_column_param_helper(zval **param,
 			return 1;
 
 		default:
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "The %s key should be either a string or an integer", name);
+            php_error_docref(NULL TSRMLS_CC, E_WARNING, "The %s key should be a string, an integer, or a callable", name);
 			return 0;
 	}
 }
@@ -2558,52 +2564,104 @@ PHP_FUNCTION(array_column)
 	zval **zcolumn = NULL, **zkey = NULL, **data;
 	HashTable *arr_hash;
 	HashPosition pointer;
+	zend_fcall_info data_fci, key_fci;
+    zend_fcall_info_cache data_fci_cache, key_fci_cache;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "hZ!|Z!", &arr_hash, &zcolumn, &zkey) == FAILURE) {
 		return;
 	}
 
-	if ((zcolumn && !array_column_param_helper(zcolumn, "column" TSRMLS_CC)) ||
-	    (zkey && !array_column_param_helper(zkey, "index" TSRMLS_CC))) {
+    // introduce new variables so we don't have to keep checking
+	zend_bool zcolumn_is_callable = zcolumn && zend_is_callable_ex(*zcolumn, NULL, 0, NULL, NULL, NULL, NULL TSRMLS_CC);
+    zend_bool zkey_is_callable = zkey && zend_is_callable_ex(*zkey, NULL, 0, NULL, NULL, NULL, NULL TSRMLS_CC);
+
+    // error checking on parameters
+	if ((zcolumn && !array_column_param_helper(zcolumn, zcolumn_is_callable, "column" TSRMLS_CC)) ||
+	    (zkey && !array_column_param_helper(zkey, zkey_is_callable, "index" TSRMLS_CC))) {
 		RETURN_FALSE;
 	}
 
+	// initialize callbacks if they are passed in
+	if(zcolumn_is_callable) {
+	    zend_fcall_info_init(*zcolumn, 0, &data_fci, &data_fci_cache, NULL, NULL TSRMLS_CC);
+	    data_fci.param_count = 1;
+	}
+
+	if(zkey_is_callable) {
+        zend_fcall_info_init(*zkey, 0, &key_fci, &key_fci_cache, NULL, NULL TSRMLS_CC);
+        key_fci.param_count = 1;
+	}
+
 	array_init(return_value);
+
 	for (zend_hash_internal_pointer_reset_ex(arr_hash, &pointer);
 			zend_hash_get_current_data_ex(arr_hash, (void**)&data, &pointer) == SUCCESS;
 			zend_hash_move_forward_ex(arr_hash, &pointer)) {
 		zval **zcolval, **zkeyval = NULL;
-		HashTable *ht;
 
-		if (Z_TYPE_PP(data) != IS_ARRAY) {
-			/* Skip elemens which are not sub-arrays */
-			continue;
-		}
-		ht = Z_ARRVAL_PP(data);
+		if(zcolumn_is_callable || zkey_is_callable) {
+		    // arguments for both callables are the same
+		    zval *retval_ptr;
+		    zval **args[1];
+		    args[0] = data;
 
-		if (!zcolumn) {
-			/* NULL column ID means use entire subarray as data */
-			zcolval = data;
+		    if(zcolumn_is_callable) {
+		        zcolval = (zval **)safe_emalloc(1, sizeof(zval *), 0);
+                data_fci.retval_ptr_ptr = zcolval;
+                data_fci.params = args;
 
-			/* Otherwise, skip if the value doesn't exist in our subarray */
-		} else if ((Z_TYPE_PP(zcolumn) == IS_STRING) &&
-		    (zend_hash_find(ht, Z_STRVAL_PP(zcolumn), Z_STRLEN_PP(zcolumn) + 1, (void**)&zcolval) == FAILURE)) {
-			continue;
-		} else if ((Z_TYPE_PP(zcolumn) == IS_LONG) &&
-		    (zend_hash_index_find(ht, Z_LVAL_PP(zcolumn), (void**)&zcolval) == FAILURE)) {
-			continue;
-		}
+                if (zend_call_function(&data_fci, &data_fci_cache TSRMLS_CC) == SUCCESS) {
+                    zval_ptr_dtor(zcolval);
+                } else {
+                    efree(zcolval);
+                    continue;
+                }
+		    }
 
-		/* Failure will leave zkeyval alone which will land us on the final else block below
-		 * which is to append the value as next_index
-		 */
-		if (zkey && (Z_TYPE_PP(zkey) == IS_STRING)) {
-			zend_hash_find(ht, Z_STRVAL_PP(zkey), Z_STRLEN_PP(zkey) + 1, (void**)&zkeyval);
-		} else if (zkey && (Z_TYPE_PP(zkey) == IS_LONG)) {
-			zend_hash_index_find(ht, Z_LVAL_PP(zkey), (void**)&zkeyval);
+		    if(zkey_is_callable) {
+		        key_fci.retval_ptr_ptr = &retval_ptr;
+                key_fci.params = args;
+
+                if (zend_call_function(&key_fci, &key_fci_cache TSRMLS_CC) == SUCCESS) {
+                    zval_ptr_dtor(&retval_ptr);
+                    zkeyval = &retval_ptr;
+                }
+		    }
+		} else {
+		    HashTable *ht;
+
+            if (Z_TYPE_PP(data) != IS_ARRAY) {
+                /* Skip elements which are not sub-arrays */
+                continue;
+            }
+
+            ht = Z_ARRVAL_PP(data);
+
+            if (!zcolumn) {
+                /* NULL column ID means use entire subarray as data */
+                zcolval = data;
+
+                /* Otherwise, skip if the value doesn't exist in our subarray */
+            } else if ((Z_TYPE_PP(zcolumn) == IS_STRING) &&
+                (zend_hash_find(ht, Z_STRVAL_PP(zcolumn), Z_STRLEN_PP(zcolumn) + 1, (void**)&zcolval) == FAILURE)) {
+                continue;
+            } else if ((Z_TYPE_PP(zcolumn) == IS_LONG) &&
+                (zend_hash_index_find(ht, Z_LVAL_PP(zcolumn), (void**)&zcolval) == FAILURE)) {
+                continue;
+            }
+
+            /* Failure will leave zkeyval alone which will land us on the final else block below
+             * which is to append the value as next_index
+             */
+            if (zkey && (Z_TYPE_PP(zkey) == IS_STRING)) {
+                zend_hash_find(ht, Z_STRVAL_PP(zkey), Z_STRLEN_PP(zkey) + 1, (void**)&zkeyval);
+            } else if (zkey && (Z_TYPE_PP(zkey) == IS_LONG)) {
+                zend_hash_index_find(ht, Z_LVAL_PP(zkey), (void**)&zkeyval);
+            }
 		}
 
 		Z_ADDREF_PP(zcolval);
+
 		if (zkeyval && Z_TYPE_PP(zkeyval) == IS_STRING) {
 			add_assoc_zval(return_value, Z_STRVAL_PP(zkeyval), *zcolval);
 		} else if (zkeyval && Z_TYPE_PP(zkeyval) == IS_LONG) {
@@ -2614,6 +2672,11 @@ PHP_FUNCTION(array_column)
 			add_assoc_zval(return_value, Z_STRVAL_PP(zkeyval), *zcolval);
 		} else {
 			add_next_index_zval(return_value, *zcolval);
+		}
+
+		// free
+		if(zcolumn_is_callable) {
+		    efree(zcolval);
 		}
 	}
 }
