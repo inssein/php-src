@@ -2616,7 +2616,10 @@ PHP_FUNCTION(array_column)
                     efree(zcolval);
                     continue;
                 }
+		    } else if(!zcolumn) {
+		        zcolval = data;
 		    }
+
 
 		    if(zkey_is_callable) {
 		        key_fci.retval_ptr_ptr = &retval_ptr;
