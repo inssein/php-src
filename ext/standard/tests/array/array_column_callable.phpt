@@ -20,6 +20,13 @@ function getMockObject($id, $firstName, $lastName)
     return $obj;
 };
 
+/* Array representing a possible record set returned from a database */
+$records = array(
+   getMockObject(1, 'John', 'Doe'),
+   getMockObject(2, 'Sally', 'Smith'),
+   getMockObject(3, 'Jane', 'Jones')
+);
+
 $idCallable = function (stdClass $row) {
     return $row->id;
 };
@@ -34,13 +41,6 @@ $lastNameCallable = function (stdClass $row) {
 
 echo "*** Testing array_column() : callable functionality ***\n";
 
-/* Array representing a possible record set returned from a database */
-$records = array(
-   getMockObject(1, 'John', 'Doe'),
-   getMockObject(2, 'Sally', 'Smith'),
-   getMockObject(3, 'Jane', 'Jones')
-);
-
 echo "-- first_name column from recordset --\n";
 var_dump(array_column($records, $firstNameCallable));
 
@@ -52,6 +52,12 @@ var_dump(array_column($records, $lastNameCallable, $idCallable));
 
 echo "-- last_name column from recordset, keyed by value from first_name column --\n";
 var_dump(array_column($records, $lastNameCallable, $firstNameCallable));
+
+echo "-- pass null as second parameter to get back all columns indexed by third parameter --\n";
+var_dump(array_column($records, null, $idCallable));
+
+echo "-- pass null as second parameter and no third param to get back array_values(input) --\n";
+var_dump(array_column($records, null));
 
 echo "Done\n";
 ?>
@@ -92,5 +98,65 @@ array(3) {
   string(5) "Smith"
   ["Jane"]=>
   string(5) "Jones"
+}
+-- pass null as second parameter to get back all columns indexed by third parameter --
+array(3) {
+  [1]=>
+  object(stdClass)#1 (3) {
+    ["id"]=>
+    int(1)
+    ["first_name"]=>
+    string(4) "John"
+    ["last_name"]=>
+    string(3) "Doe"
+  }
+  [2]=>
+  object(stdClass)#2 (3) {
+    ["id"]=>
+    int(2)
+    ["first_name"]=>
+    string(5) "Sally"
+    ["last_name"]=>
+    string(5) "Smith"
+  }
+  [3]=>
+  object(stdClass)#3 (3) {
+    ["id"]=>
+    int(3)
+    ["first_name"]=>
+    string(4) "Jane"
+    ["last_name"]=>
+    string(5) "Jones"
+  }
+}
+-- pass null as second parameter and no third param to get back array_values(input) --
+array(3) {
+  [0]=>
+  object(stdClass)#1 (3) {
+    ["id"]=>
+    int(1)
+    ["first_name"]=>
+    string(4) "John"
+    ["last_name"]=>
+    string(3) "Doe"
+  }
+  [1]=>
+  object(stdClass)#2 (3) {
+    ["id"]=>
+    int(2)
+    ["first_name"]=>
+    string(5) "Sally"
+    ["last_name"]=>
+    string(5) "Smith"
+  }
+  [2]=>
+  object(stdClass)#3 (3) {
+    ["id"]=>
+    int(3)
+    ["first_name"]=>
+    string(4) "Jane"
+    ["last_name"]=>
+    string(5) "Jones"
+  }
 }
 Done

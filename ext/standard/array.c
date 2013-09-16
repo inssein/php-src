@@ -2620,7 +2620,6 @@ PHP_FUNCTION(array_column)
 		        zcolval = data;
 		    }
 
-
 		    if(zkey_is_callable) {
 		        key_fci.retval_ptr_ptr = &retval_ptr;
                 key_fci.params = args;
@@ -2633,7 +2632,7 @@ PHP_FUNCTION(array_column)
 		} else {
 		    HashTable *ht;
 
-            if (Z_TYPE_PP(data) != IS_ARRAY) {
+            if (Z_TYPE_PP(data) != IS_ARRAY && (zcolumn || zkey)) {
                 /* Skip elements which are not sub-arrays */
                 continue;
             }
